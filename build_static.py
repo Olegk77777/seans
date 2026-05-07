@@ -22,6 +22,7 @@
 """
 
 import argparse
+import json
 import os
 import re
 import shutil
@@ -39,6 +40,9 @@ DEFAULT_DATA_DIR = Path.home() / "Library" / "Application Support" / "Сеанс
 DATA_DIR = Path(DATA_DIR_ENV) if DATA_DIR_ENV else DEFAULT_DATA_DIR
 
 SERVER_URL = "http://127.0.0.1:8765"
+
+# Чтобы импорт app.py видел тот же корпус, что и наш билд.
+os.environ.setdefault("SEANS_DATA_DIR", str(DATA_DIR))
 
 
 # ─────────────────────────────────────────────────────────────────
@@ -323,6 +327,61 @@ def take_snapshot() -> None:
 
 
 # ─────────────────────────────────────────────────────────────────
+# 3.5. Обогащение data.json текстами из локального корпуса
+# ─────────────────────────────────────────────────────────────────
+#
+# В poems.json у части записей лежит только excerpt + link, без полного
+# text. В десктопе модалка догружает текст через /api/poem (там вызывается
+# _try_corpus). На статике /api/poem заглушен — поэтому полный текст надо
+# вписать прямо в data.json на этапе сборки.
+
+def enrich_data_json() -> None:
+    target = OUT_DIR / "data.json"
+    if not target.exists():
+        print(f"  [skip enrich] {target.name} нет — пропускаю")
+        return
+
+    sys.path.insert(0, str(ROOT))
+    try:
+        import app  # type: ignore
+    except Exception as e:
+        sys.stderr.write(f"  [enrich] не удалось импортировать app.py: {e}\n")
+        return
+
+    print("→ Обогащаю data.json текстами из корпуса…")
+    with target.open("r", encoding="utf-8") as f:
+        data = json.load(f)
+
+    app.ensure_corpus_loaded()
+    if not app._CORPUS_INDEX:
+        print("  [warn] корпус пустой — нечего подмешивать")
+        return
+
+    enriched = 0
+    missing = 0
+    for item in data:
+        if item.get("type") != "poem":
+            continue
+        if item.get("text"):
+            continue
+        text = app._try_corpus(item)
+        if text:
+            item["text"] = text
+            enriched += 1
+        elif item.get("link"):
+            missing += 1
+
+    if enriched == 0:
+        print(f"  ничего не добавил (без текста: {missing})")
+        return
+
+    with target.open("w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False)
+    size_mb = target.stat().st_size / (1024 * 1024)
+    print(f"  ✓ обогащено: {enriched}  ·  без текста осталось: {missing}  ·  размер: {size_mb:.1f} МБ")
+
+
+# ─────────────────────────────────────────────────────────────────
 # 4. Точка входа
 # ─────────────────────────────────────────────────────────────────
 
@@ -337,6 +396,8 @@ def main() -> None:
     if args.snapshot:
         print("→ Снимаю snapshot данных из работающего сервера…")
         take_snapshot()
+
+    enrich_data_json()
 
     print("→ Извлекаю HTML_PAGE из app.py…")
     src = APP_PY.read_text(encoding="utf-8")
