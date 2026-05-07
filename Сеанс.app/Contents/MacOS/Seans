@@ -1,0 +1,128 @@
+#!/bin/bash
+# Сеанс — лончер macOS .app
+# Хранит всё в ~/Library/Application Support/Сеанс/ — стандарт macOS.
+# При первом запуске копирует данные из старого «АскБука Поэзии», если они есть.
+
+set -u
+
+APP_BUNDLE="$(cd "$(dirname "$0")/../.." && pwd)"
+RES_DIR="$APP_BUNDLE/Contents/Resources"
+
+SUPPORT_DIR="$HOME/Library/Application Support/Сеанс"
+DATA_DIR="$SUPPORT_DIR/data"
+VENV_DIR="$SUPPORT_DIR/venv"
+LOG_FILE="$SUPPORT_DIR/app.log"
+PID_FILE="$SUPPORT_DIR/app.pid"
+
+mkdir -p "$DATA_DIR" "$SUPPORT_DIR"
+
+# Ротация лога при >1 МБ
+if [ -f "$LOG_FILE" ] && [ "$(stat -f%z "$LOG_FILE" 2>/dev/null || echo 0)" -gt 1048576 ]; then
+    mv "$LOG_FILE" "$LOG_FILE.old"
+fi
+
+echo "=== $(date) запуск (Сеанс) ===" >> "$LOG_FILE"
+
+notify() {
+    /usr/bin/osascript -e "display notification \"$2\" with title \"$1\"" >/dev/null 2>&1 || true
+}
+alert() {
+    /usr/bin/osascript -e "display alert \"$1\" message \"$2\" as critical" >/dev/null 2>&1 || true
+}
+
+# === Миграция из старого «АскБука Поэзии» ===
+# При первом запуске — переносим всё, что было: poems.json, корпуса, цитаты,
+# кадры, manual-CSV. Старая папка остаётся как бэкап (не удаляем).
+OLD_SUPPORT="$HOME/Library/Application Support/АскБука Поэзии"
+PROJECT_DATA="$(dirname "$APP_BUNDLE")/data"  # data/ рядом с .app, если есть
+
+migrate_from() {
+    local SRC="$1"
+    [ -d "$SRC" ] || return 0
+    local copied=0
+    for path in "$SRC/poems.json" "$SRC"/corpus*.csv "$SRC"/quotes_*.csv \
+                "$SRC/screenshots.json"; do
+        [ -e "$path" ] || continue
+        local name="$(basename "$path")"
+        if [ ! -e "$DATA_DIR/$name" ]; then
+            cp "$path" "$DATA_DIR/$name" && copied=$((copied+1))
+        fi
+    done
+    if [ -d "$SRC/screenshots" ] && [ ! -d "$DATA_DIR/screenshots" ]; then
+        cp -R "$SRC/screenshots" "$DATA_DIR/screenshots" && copied=$((copied+1))
+    fi
+    if [ "$copied" -gt 0 ]; then
+        echo "Мигрировал $copied файлов из $SRC" >> "$LOG_FILE"
+    fi
+}
+
+# Если ещё не было миграции — пробуем
+if [ ! -f "$DATA_DIR/poems.json" ]; then
+    migrate_from "$OLD_SUPPORT/data"
+    migrate_from "$PROJECT_DATA"
+fi
+
+# === Уже запущено? ===
+if [ -f "$PID_FILE" ]; then
+    OLD_PID="$(cat "$PID_FILE" 2>/dev/null || echo)"
+    if [ -n "$OLD_PID" ] && kill -0 "$OLD_PID" 2>/dev/null; then
+        /usr/bin/open "http://localhost:8765"
+        notify "Сеанс" "Приложение уже запущено"
+        exit 0
+    fi
+fi
+
+# === Системный python3 ===
+SYS_PY=""
+for cand in /opt/homebrew/bin/python3 /usr/local/bin/python3 /usr/bin/python3; do
+    if [ -x "$cand" ]; then SYS_PY="$cand"; break; fi
+done
+if [ -z "$SYS_PY" ] && command -v python3 >/dev/null 2>&1; then
+    SYS_PY="$(command -v python3)"
+fi
+if [ -z "$SYS_PY" ]; then
+    alert "Python 3 не найден" "Установи Python 3: brew install python3"
+    exit 1
+fi
+
+# === venv ===
+VENV_PY="$VENV_DIR/bin/python3"
+if [ ! -x "$VENV_PY" ]; then
+    notify "Сеанс" "Создаю окружение…"
+    "$SYS_PY" -m venv "$VENV_DIR" >>"$LOG_FILE" 2>&1
+    if [ ! -x "$VENV_PY" ]; then
+        alert "Не удалось создать окружение" "Смотри лог: $LOG_FILE"
+        exit 1
+    fi
+fi
+
+# === Зависимости ===
+if ! "$VENV_PY" -c "import requests, bs4, lxml, webview" >/dev/null 2>&1; then
+    notify "Сеанс" "Устанавливаю зависимости…"
+    "$VENV_PY" -m pip install --upgrade pip >>"$LOG_FILE" 2>&1
+    "$VENV_PY" -m pip install requests beautifulsoup4 lxml 'pywebview[cocoa]' \
+        pyobjc-core pyobjc-framework-Cocoa pyobjc-framework-WebKit >>"$LOG_FILE" 2>&1
+    if ! "$VENV_PY" -c "import requests, bs4, lxml, webview" >/dev/null 2>&1; then
+        alert "Не удалось установить зависимости" "Смотри лог: $LOG_FILE"
+        exit 1
+    fi
+fi
+
+# === Pillow для ресайза кадров кино (см. CLAUDE.md «Правило размера») ===
+# Необязательно для запуска: если не встанет, приложение работает без ресайза,
+# картинки сохраняются как есть.
+if ! "$VENV_PY" -c "from PIL import Image; import pillow_heif" >/dev/null 2>&1; then
+    notify "Сеанс" "Ставлю Pillow для ресайза кадров…"
+    "$VENV_PY" -m pip install Pillow pillow-heif >>"$LOG_FILE" 2>&1 || true
+fi
+
+export SEANS_DATA_DIR="$DATA_DIR"
+export PYTHONUNBUFFERED=1
+
+cd "$RES_DIR"
+"$VENV_PY" app.py >>"$LOG_FILE" 2>&1 &
+APP_PID=$!
+echo "$APP_PID" > "$PID_FILE"
+
+wait "$APP_PID"
+rm -f "$PID_FILE"

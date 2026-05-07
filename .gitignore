@@ -1,0 +1,20 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+
+# macOS
+.DS_Store
+
+# Локальный fallback-кэш (используется лончером на первом запуске)
+# В репо не храним — рабочие данные живут в ~/Library/Application Support/Сеанс/data/
+data/
+
+# Логи и временные файлы
+*.log
+.app.pid
+*.swp
+
+# IDE
+.idea/
+.vscode/
