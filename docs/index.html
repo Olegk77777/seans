@@ -2412,6 +2412,16 @@ function App() {
   };
   useEffect(() => { reload(); }, []);
 
+  // Прогрев кеша картинок: переключение «Следующий →» в кино-рулетке
+  // должно быть мгновенным, без мигания. Создаём Image-объекты, браузер
+  // подтягивает все 15 кадров в фоне, потом отдаёт из кеша.
+  useEffect(() => {
+    if (!data || !data.FRAMES) return;
+    for (const f of data.FRAMES) {
+      if (f.img) { const im = new Image(); im.src = f.img; }
+    }
+  }, [data]);
+
   const toggleFav = id => setFavs(prev => {
     const n = new Set(prev);
     n.has(id) ? n.delete(id) : n.add(id);
