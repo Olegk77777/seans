@@ -3643,12 +3643,8 @@ function Cinema({ data, subSection, setSubSection, favs, toggleFav, onFrameChang
 
   const goNext = () => {
     if (FRAMES.length <= 1) return;
-    setShuffling(true);
-    setTimeout(() => {
-      setHistory(h => [...h, current]);
-      setCurrent(c => pickRandom(c));
-      setShuffling(false);
-    }, 230);
+    setHistory(h => [...h, current]);
+    setCurrent(c => pickRandom(c));
   };
 
   const goPrev = () => {
