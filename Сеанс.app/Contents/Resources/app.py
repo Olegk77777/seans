@@ -2390,7 +2390,7 @@ body[data-theme='light'] .quote-card { background: #FBF6EA; }
 }
 .frame-card .details .why {
   font-family: var(--font-body);
-  font-size: 18px;
+  font-size: 16px;
   line-height: 1.55;
   color: #D0C4A6;
   margin: 16px 0 0;
