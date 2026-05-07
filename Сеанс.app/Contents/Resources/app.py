@@ -2138,7 +2138,7 @@ body[data-theme='light'] .poem-card { background: #FBF6EA; }
 .poem-card .excerpt {
   padding: 26px 32px 20px;
   font-family: var(--font-body);
-  font-size: 19px;
+  font-size: 21px;
   line-height: 1.5;
   color: var(--ink);
 }
@@ -2146,7 +2146,7 @@ body[data-theme='light'] .poem-card { background: #FBF6EA; }
 .poem-card .excerpt p + p { margin-top: 0; }
 .poem-card .excerpt .drop {
   font-family: var(--font-display);
-  font-size: 34px;
+  font-size: 38px;
   line-height: 1;
   color: var(--accent);
   margin-right: 1px;
@@ -2218,7 +2218,7 @@ body[data-theme='light'] .quote-card { background: #FBF6EA; }
   top: 14px; left: 16px;
 }
 .quote-card .text {
-  font-size: 20px;
+  font-size: 22px;
   font-style: italic;
   line-height: 1.45;
   color: var(--ink);
@@ -2228,7 +2228,7 @@ body[data-theme='light'] .quote-card { background: #FBF6EA; }
   text-wrap: pretty;
 }
 @media (max-width: 520px) {
-  .quote-card .text { padding-right: 72px; font-size: 18px; }
+  .quote-card .text { padding-right: 72px; font-size: 20px; }
 }
 .quote-card .attr {
   margin-top: 16px;
@@ -2390,7 +2390,7 @@ body[data-theme='light'] .quote-card { background: #FBF6EA; }
 }
 .frame-card .details .why {
   font-family: var(--font-body);
-  font-size: 16px;
+  font-size: 18px;
   line-height: 1.55;
   color: #D0C4A6;
   margin: 16px 0 0;
@@ -2546,7 +2546,7 @@ body[data-theme='light'] .quote-card { background: #FBF6EA; }
 }
 .poem-row .poem-title {
   font-family: var(--font-body);
-  font-size: 17px;
+  font-size: 19px;
   color: var(--ink);
   flex: 0 0 auto;
   max-width: 280px;
@@ -2554,7 +2554,7 @@ body[data-theme='light'] .quote-card { background: #FBF6EA; }
 .poem-row .excerpt {
   font-family: var(--font-body);
   font-style: italic;
-  font-size: 14px;
+  font-size: 16px;
   color: var(--ink-2);
   flex: 1;
   overflow: hidden;
@@ -2635,14 +2635,14 @@ body[data-theme='light'] .poem-modal { background: #FBF6EA; }
 .poem-modal h2 {
   font-family: var(--font-display);
   font-weight: 400;
-  font-size: 42px;
+  font-size: 46px;
   line-height: 1.05;
   margin: 0 0 8px;
 }
 .poem-modal .author-line {
   font-family: var(--font-body);
   font-style: italic;
-  font-size: 18px;
+  font-size: 20px;
   color: var(--ink-2);
   margin-bottom: 36px;
   padding-bottom: 24px;
@@ -2650,7 +2650,7 @@ body[data-theme='light'] .poem-modal { background: #FBF6EA; }
 }
 .poem-modal .poem-text {
   font-family: var(--font-body);
-  font-size: 20px;
+  font-size: 22px;
   line-height: 1.6;
   color: var(--ink);
   white-space: pre-wrap;
@@ -2956,10 +2956,10 @@ body[data-theme='light'] .frame-add-box { background: #FBF6EA; }
   .masthead .issue { justify-content: center; }
   .masthead .theme-switch { justify-self: center; }
   .sections .tab { padding: 8px 20px 18px; font-size: 17px; }
-  .poem-card .excerpt { padding: 32px 24px 20px; font-size: 20px; }
+  .poem-card .excerpt { padding: 32px 24px 20px; font-size: 22px; }
   .poem-card .meta { padding: 16px 24px; flex-wrap: wrap; }
   .quote-card { padding: 32px 24px; }
-  .quote-card .text { font-size: 22px; padding-left: 20px; }
+  .quote-card .text { font-size: 24px; padding-left: 20px; }
   .quote-card .attr { padding-left: 20px; }
   .frame-card .details { padding: 24px; }
   .frame-card .details h2 { font-size: 28px; }
