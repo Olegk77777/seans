@@ -11,12 +11,20 @@ askbooka.ru → Wayback Machine. Изначально парсил askbooka.ru, 
 ```
 AskBukaPoetry/                           # имя папки проекта оставлено (исторически)
 ├── app.py                               # ядро: парсер + HTTP + HTML UI (React UMD) + pywebview
+├── build_static.py                      # сборщик GitHub Pages версии (см. раздел ниже)
 ├── pdf_to_csv.py                        # парсер PDF-сборников → CSV
 ├── wikiquote_fetch.py                   # скачивание цитат с ru.wikiquote.org
 ├── wayback_drain.py                     # массовое скачивание стихов через web.archive.org
 ├── README.md
-├── data/                                # старое расположение кэша (fallback)
-├── .claude/launch.json                  # конфиг preview_start
+├── .gitignore
+├── data/                                # старое расположение кэша (fallback, в .gitignore)
+├── docs/                                # ← GitHub Pages root (read-only зеркало)
+│   ├── index.html                       # сгенерирован build_static.py из HTML_PAGE
+│   ├── data.json                        # snapshot /api/poems (~36 МБ, gzip ~10 МБ)
+│   ├── screenshots.json                 # snapshot /api/screenshots
+│   ├── screenshots/                     # копия кадров
+│   └── .nojekyll                        # ОБЯЗАТЕЛЬНО (см. грабли)
+├── .claude/launch.json                  # конфиг preview_start (app + статика)
 └── Сеанс.app/                           # macOS-бандл
     └── Contents/
         ├── Info.plist                   # CFBundleName=Сеанс
@@ -146,6 +154,82 @@ python3 wikiquote_fetch.py "Виктор Цой" "Курт Кобейн" "Уин
 сбое можно перезапустить — пропустит уже скачанное.
 
 Лог: `/tmp/wayback_drain.log`. Темп: ~6 успехов/мин (зависит от Wayback).
+
+## GitHub Pages — публичная веб-версия
+
+Read-only зеркало для просмотра с iPad/телефона/чужих устройств.
+**URL:** https://olegk77777.github.io/seans/
+**Репо:** https://github.com/Olegk77777/seans (Public, branch `main`)
+**Pages source:** `main` / `/docs` (включается через `gh api -X POST repos/.../pages -f 'source[branch]=main' -f 'source[path]=/docs'`).
+
+### Что вошло в Pages-версию
+
+- Рулетка стихов/цитат, Библиотека поэтов, Кино-галерея и кино-рулетка
+- Поиск, фильтры, переключение тёмной/светлой темы, копирование в буфер
+
+### Что вырезано (write-операции на сервер не работают)
+
+- ♥ Избранное (полностью: подтабы, кнопки на карточках, категория `fav`,
+  счётчик в футере, GET/POST `/api/favorites` → no-op)
+- «Обновить с сайта», «Скачать тексты», «Стоп», «Открыть папку данных»
+  (всё меню «Настройки» в Roulette)
+- «Добавить кадр» (в EmptyState, рулетке, галерее)
+- «✏️ Редактировать» / «🗑 Удалить» в карточке кадра (оставлен только ⧉)
+- «✏️ Вписать вручную» в модалке стиха
+
+### Сборщик `build_static.py`
+
+Извлекает HTML_PAGE из app.py, применяет ~21 точечную правку
+(серия `str.replace` с проверкой количества вхождений — если в HTML_PAGE
+правка не нашлась, скрипт падает с ошибкой), кладёт результат в `docs/index.html`.
+
+```bash
+python3 build_static.py             # пересобрать только index.html
+python3 build_static.py --snapshot  # дополнительно — свежий snapshot data.json
+                                    # (требует запущенный app.py на :8765)
+```
+
+`--snapshot` дёргает `/api/poems` и `/api/screenshots` через curl и копирует
+папку `screenshots/` из `SEANS_DATA_DIR`.
+
+### Workflow обновления Pages
+
+После любой правки `app.py` (UI/JS), которую хочется опубликовать:
+
+```bash
+# 1. Если поменялась только UI/HTML/JS:
+python3 build_static.py
+
+# 1'. Если поменялась база (новые стихи/кадры/корпуса):
+ASKBUKA_GUI=0 python3 app.py &       # или просто запусти Сеанс.app
+python3 build_static.py --snapshot
+
+# 2. Синхронизировать копию в бандле (если правил app.py):
+cp app.py "Сеанс.app/Contents/Resources/app.py"
+
+# 3. Пуш — Pages обновится через ~40 секунд:
+git add app.py docs/ "Сеанс.app/Contents/Resources/app.py"
+git commit -m "..."
+git push
+```
+
+### Эндпоинты после статической трансформации
+
+| Динамика (app.py)              | Статика (Pages)                                              |
+|--------------------------------|--------------------------------------------------------------|
+| `GET /api/poems`               | `fetch('./data.json')`                                       |
+| `GET /api/screenshots`         | `fetch('./screenshots.json')`                                |
+| `GET /api/poem?url=…`          | `Promise.resolve({ok:false})` (тексты уже встроены в data.json) |
+| `GET /api/favorites`           | `Promise.resolve({ok:true, ids:[]})`                         |
+| `POST /api/favorites`          | no-op комментарий                                            |
+| `GET /img/<file>`              | `./screenshots/<file>`                                       |
+
+### Размеры и производительность
+
+- `data.json`: 36 МБ → CDN GitHub отдаёт gzip'ом ~10 МБ. На iPad парсится ~1-2 сек.
+- `screenshots/`: 5.8 МБ всего (15 кадров). При старте делается `new Image()`
+  для каждого — прогрев кеша, переключение «Следующий» становится мгновенным.
+- Лимиты Pages: файл ≤100 МБ, репо ≤1 ГБ, бандвидс 100 ГБ/мес. Хватит с запасом.
 
 ## Частые операции
 
@@ -418,8 +502,35 @@ python3 wikiquote_fetch.py "Виктор Цой" "Курт Кобейн" "Уин
   вызовет перетасовку всей колоды и «исчезновение» карточки. Проверено.
 - **Первый символ стиха — не буква** (например, «…»): буквицу не рисуем,
   иначе крупная точка выглядит как дефект.
+- **GitHub Pages режет файлы с `_`/`.` в начале** — Jekyll по умолчанию
+  игнорирует такие пути. В `docs/__2022-01-19__175746.png` это давало 404.
+  Лечение: пустой файл `docs/.nojekyll` отключает Jekyll-обработку
+  и заодно ускоряет первый билд.
+- **shuffleOut-анимация в кино-рулетке давала «мигание»** — `goNext`/`goPrev`
+  раньше включали `setShuffling(true)` на 230ms и применяли keyframe
+  с opacity 1→0→1 + блюр. Юзер видел: старая → исчезла → появилась
+  снова → новая. Решение: убрать `setShuffling` из next/prev (оставить
+  только в явном `shuffle()` если когда-нибудь будет кнопка «Перемешать»
+  в кино).
+- **Прогрев Image-кеша при старте** — без `new Image()` на каждый
+  `f.img` при загрузке data, переключение кадра в кино показывает
+  пустой кадр на момент загрузки jpeg. Эффект особенно заметен на iPad.
+  Прогрев решён в `App` через `useEffect([data])`.
 
 ## Планы (что хочется сделать дальше)
+
+### Сделано в сессии мая 2026
+
+- [x] **GitHub Pages зеркало** на `olegk77777.github.io/seans/` — read-only
+  публичная веб-версия для iPad/телефона
+- [x] `build_static.py` — сборщик из `app.py` в `docs/index.html`
+  с серией точечных правок (write-кнопки, избранное, эндпоинты → JSON)
+- [x] `.nojekyll` — фикс 404 для `__2022-01-19__175746.png`
+- [x] Убрал `shuffleOut`-анимацию с `goNext`/`goPrev` в кино — было колхозное
+  «исчезла-появилась-сменилась» мигание; теперь переключение мгновенное
+- [x] Прогрев Image-кеша при старте — переключение «Следующий» в кино без задержки
+- [x] Шрифты в стихах и цитатах подросли на ~10-15%
+  (поэтическая карточка 19→21, цитата 20→22, модалка 20→22, и т.д.)
 
 ### Сделано в сессии апреля 2026
 
