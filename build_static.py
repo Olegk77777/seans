@@ -274,6 +274,23 @@ EDITS: list[tuple[str, str, str, int]] = [
         "<title>Сеанс — литературно-визуальная рулетка</title>\n<meta name=\"description\" content=\"Не библиотека — рулетка для вдохновения. Стих, цитата или кадр из кино, выпавшие наугад. Не ищите — пусть случай выберет за вас.\"/>",
         1,
     ),
+
+    # ── Pages: при каждом заходе открываем «Литература → Рулетка» ──
+    # В приложении выбор раздела/подраздела запоминается в localStorage,
+    # это удобно для одного владельца. На публичной версии — наоборот:
+    # случайный посетитель должен сразу попадать в рулетку, даже если
+    # в прошлый визит сам клацнул на библиотеку. Тема (light/dark)
+    # остаётся персистентной — это про визуальный комфорт, не навигацию.
+    (
+        "Pages: всегда открываем «Литература → Рулетка»",
+        """  const [section, setSection] = useState(() => localStorage.getItem('seance.section') || 'lit');
+  const [litSub, setLitSub] = useState(() => localStorage.getItem('seance.litSub') || 'roulette');
+  const [cineSub, setCineSub] = useState(() => localStorage.getItem('seance.cineSub') || 'roulette');""",
+        """  const [section, setSection] = useState(() => 'lit');
+  const [litSub, setLitSub] = useState(() => 'roulette');
+  const [cineSub, setCineSub] = useState(() => 'roulette');""",
+        1,
+    ),
 ]
 
 
