@@ -250,10 +250,10 @@ EDITS: list[tuple[str, str, str, int]] = [
     # ── Категория 'fav' в фильтрах рулетки ───────────────────────
     (
         "Drop 'Избранное' from category filters",
-        """    { id: 'all', label: 'Всё', count: POEMS.length + QUOTES.length },
+        """    { id: 'all', label: 'Всё', count: usablePoems.length + QUOTES.length },
     { id: 'fav', label: 'Избранное', count: 0 },
   ];""",
-        """    { id: 'all', label: 'Всё', count: POEMS.length + QUOTES.length },
+        """    { id: 'all', label: 'Всё', count: usablePoems.length + QUOTES.length },
   ];""",
         1,
     ),

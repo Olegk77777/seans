@@ -1528,17 +1528,20 @@ function buildDataset(raw, frames) {
     nameHay: normalize(p.name),
   })).sort((a, b) => a.name.localeCompare(b.name, 'ru'));
 
+  // Счётчики категорий считаем только по стихам с текстом — иначе цифра
+  // в фильтре расходится с фактическим числом карточек в рулетке.
+  const usablePoems = POEMS.filter(p => p.hasText);
   const catCount = new Map();
-  for (const p of POEMS) {
+  for (const p of usablePoems) {
     const c = (p.category || '').trim();
     if (!c) continue;
     catCount.set(c, (catCount.get(c) || 0) + 1);
   }
   const CATEGORIES = [
-    { id: 'all', label: 'Всё', count: POEMS.length + QUOTES.length },
+    { id: 'all', label: 'Всё', count: usablePoems.length + QUOTES.length },
   ];
   if (QUOTES.length) CATEGORIES.push({ id: '__quotes', label: 'Цитаты', count: QUOTES.length });
-  if (POEMS.length) CATEGORIES.push({ id: '__poems', label: 'Только стихи', count: POEMS.length });
+  if (usablePoems.length) CATEGORIES.push({ id: '__poems', label: 'Только стихи', count: usablePoems.length });
   const sortedCats = Array.from(catCount.entries()).sort((a, b) => b[1] - a[1]);
   for (const [name, count] of sortedCats) {
     if (!/цитат/i.test(name)) CATEGORIES.push({ id: 'cat::' + name, label: name, count });
@@ -1676,12 +1679,18 @@ function Roulette({ data, openPoem, favs, toggleFav, onAuthorClick, lockedCatego
 
   const deckBase = useMemo(() => {
     if (category === '__quotes') return QUOTES;
-    if (category === '__poems') return POEMS;
+    // В избранном показываем всё отмеченное, даже если текст не подгрузился.
+    if (category === 'fav') return [...POEMS, ...QUOTES];
+    // Для рулетки берём только стихи с текстом — без него карточка
+    // деградирует до одного заголовка. В библиотеке такие записи остаются:
+    // там можно открыть модалку и вписать текст вручную через ✏️.
+    const usablePoems = POEMS.filter(p => p.hasText);
+    if (category === '__poems') return usablePoems;
     if (category && category.startsWith('cat::')) {
       const name = category.slice(5);
-      return POEMS.filter(p => p.category === name);
+      return usablePoems.filter(p => p.category === name);
     }
-    return [...POEMS, ...QUOTES];
+    return [...usablePoems, ...QUOTES];
   }, [category, POEMS, QUOTES]);
 
   const deckWithQuery = useMemo(() => {
