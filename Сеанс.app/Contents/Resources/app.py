@@ -2170,7 +2170,7 @@ body[data-theme='light'] .poem-card { background: #FBF6EA; }
 .poem-card .excerpt {
   padding: 26px 32px 20px;
   font-family: var(--font-body);
-  font-size: 21px;
+  font-size: 22px;
   line-height: 1.5;
   color: var(--ink);
 }
@@ -2250,7 +2250,7 @@ body[data-theme='light'] .quote-card { background: #FBF6EA; }
   top: 14px; left: 16px;
 }
 .quote-card .text {
-  font-size: 22px;
+  font-size: 23px;
   font-style: italic;
   line-height: 1.45;
   color: var(--ink);
@@ -2260,7 +2260,7 @@ body[data-theme='light'] .quote-card { background: #FBF6EA; }
   text-wrap: pretty;
 }
 @media (max-width: 520px) {
-  .quote-card .text { padding-right: 72px; font-size: 20px; }
+  .quote-card .text { padding-right: 72px; font-size: 21px; }
 }
 .quote-card .attr {
   margin-top: 16px;
@@ -2682,7 +2682,7 @@ body[data-theme='light'] .poem-modal { background: #FBF6EA; }
 }
 .poem-modal .poem-text {
   font-family: var(--font-body);
-  font-size: 22px;
+  font-size: 23px;
   line-height: 1.6;
   color: var(--ink);
   white-space: pre-wrap;
