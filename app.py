@@ -1776,6 +1776,38 @@ img { max-width: 100%; display: block; }
   color: var(--paper);
 }
 
+.tagline {
+  text-align: center;
+  padding: 18px 18px 16px;
+  max-width: 640px;
+  margin: 0 auto;
+}
+.tagline .lead {
+  font-family: var(--font-display);
+  font-size: 20px;
+  line-height: 1.35;
+  letter-spacing: .01em;
+  color: var(--ink);
+  margin: 0 0 6px;
+}
+.tagline .lead em {
+  color: var(--accent);
+  font-style: italic;
+}
+.tagline .sub {
+  font-family: var(--font-body);
+  font-size: 14px;
+  font-style: italic;
+  color: var(--ink-2);
+  margin: 0;
+  line-height: 1.5;
+}
+@media (max-width: 600px) {
+  .tagline { padding: 14px 14px 12px; }
+  .tagline .lead { font-size: 17px; }
+  .tagline .sub { font-size: 13px; }
+}
+
 .sections {
   display: flex;
   justify-content: center;
@@ -3172,6 +3204,15 @@ function Masthead({ theme, setTheme }) {
       e('button', { className: theme==='light'?'active':'', onClick:()=>setTheme('light'), title:'Светлая' }, e(Icon.sun))));
 }
 
+// ═══════════ TAGLINE ═══════════
+function Tagline() {
+  return e('div', { className: 'tagline' },
+    e('p', { className: 'lead' },
+      'Не библиотека — ', e('em', null, 'рулетка для вдохновения')),
+    e('p', { className: 'sub' },
+      'Стих, цитата или кадр из кино — наугад, как карта из колоды. Не ищите — пусть случай выберет за вас.'));
+}
+
 // ═══════════ NAV ═══════════
 function Sections({ section, setSection }) {
   return e('nav', { className: 'sections' },
@@ -4101,6 +4142,7 @@ function App() {
   if (!data) {
     return e('div', { className:'shell' },
       e(Masthead, { theme, setTheme }),
+      e(Tagline),
       e('div', { className:'loading-screen' },
         e('span', { className:'spin' }, '✦'),
         'Собираю сеанс…'));
@@ -4120,6 +4162,7 @@ function App() {
     showBack && e('button', { className:'back-btn', onClick: goBack, title: openedPoem ? 'Закрыть' : 'Назад' },
       e(Icon.arrowLeft)),
     e(Masthead, { theme, setTheme }),
+    e(Tagline),
     e(Sections, { section, setSection: navSection }),
     section === 'lit'
       ? e('div', { className:'view active' },
