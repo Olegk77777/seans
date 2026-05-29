@@ -156,6 +156,62 @@ def clean_text(text):
     return '\n'.join(l for l in lines if l)
 
 
+def _normalize_stanzas(text, aggressive=False):
+    """Чинит артефакт парсинга, когда пустые строки натыканы после почти
+    каждой строки — в модалке стих разваливается на «дырки» и плохо читается.
+
+    Два источника беды: Wayback-дренаж (каждая строка обёрнута в свой блок →
+    пустая после КАЖДОЙ строки) и часть PDF Рыжего (пустая через одну-две).
+
+    Эвристика по «строфам» (блоки непустых строк, разделённые пустыми):
+      • если максимальный блок = 1 строка (пустая после каждой) — это
+        бесспорный артефакт, чистим всегда, в любом источнике;
+      • для заведомо «грязных» источников (Wayback, PDF Рыжего) дополнительно
+        чистим мелкую нарезку (блоки ≤ 2 строк, и их много).
+    Настоящую крупную строфику (Бродский: строфы по 4-8 строк, лесенка с
+    отступами) и классиков (у них пустых строк нет вовсе) не трогаем —
+    ведущие пробелы строк сохраняются, рвутся только пустые-разделители.
+    """
+    if '\n\n' not in text:
+        return text  # нет пустых строк — мгновенный выход (классики)
+    lines = [ln.rstrip() for ln in text.replace('\r\n', '\n').split('\n')]
+    while lines and not lines[0].strip():
+        lines.pop(0)
+    while lines and not lines[-1].strip():
+        lines.pop()
+    if not lines:
+        return text
+    block_lens = []
+    cur = 0
+    for ln in lines:
+        if ln.strip():
+            cur += 1
+        elif cur:
+            block_lens.append(cur)
+            cur = 0
+    if cur:
+        block_lens.append(cur)
+    if not block_lens:
+        return text
+    mx = max(block_lens)
+    artifact = (mx <= 1) or (aggressive and mx <= 2 and len(block_lens) >= 4)
+    if artifact:
+        # убираем все пустые-разделители — стих становится сплошным
+        return '\n'.join(ln for ln in lines if ln.strip())
+    # не артефакт — лишь схлопываем кратные пустые строки в одну
+    out = []
+    blank = False
+    for ln in lines:
+        if ln.strip():
+            out.append(ln)
+            blank = False
+        else:
+            if not blank:
+                out.append('')
+            blank = True
+    return '\n'.join(out)
+
+
 def parse_author_title(full_title):
     match = re.match(r'(.+?)\s*[«""](.+?)[»""]', full_title)
     if match:
@@ -732,6 +788,10 @@ def _parse_corpus_items():
         f_author = fields.get('author', 'author')
         f_title = fields.get('title', 'title')
         f_text = fields.get('text', 'text')
+        # Wayback и PDF Рыжего — заведомо «грязные» парсеры: чиним их строфику
+        # агрессивнее (см. _normalize_stanzas).
+        fname = path.name.lower()
+        aggressive = ('wayback' in fname) or ('ryzhy' in fname)
         try:
             with open(path, 'r', encoding='utf-8', errors='replace') as f:
                 reader = _csv.DictReader(f)
@@ -741,6 +801,7 @@ def _parse_corpus_items():
                     text = (row.get(f_text) or '').strip()
                     if not a or not t or not text:
                         continue
+                    text = _normalize_stanzas(text, aggressive)
                     flat = ' '.join(text.split())
                     excerpt = flat[:220] + ('…' if len(flat) > 220 else '')
                     category = (row.get('themes/item/0') or '').strip() or 'Классика'
