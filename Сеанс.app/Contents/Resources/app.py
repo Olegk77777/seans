@@ -1072,6 +1072,8 @@ def _load_corpus_into_index():
         f_author = fields.get('author', 'author')
         f_title = fields.get('title', 'title')
         f_text = fields.get('text', 'text')
+        # Wayback и PDF Рыжего — заведомо «грязные» парсеры (см. _normalize_stanzas).
+        aggressive = ('wayback' in path.name.lower()) or ('ryzhy' in path.name.lower())
         with open(path, 'r', encoding='utf-8', errors='replace') as f:
             reader = csv.DictReader(f)
             for row in reader:
@@ -1082,6 +1084,7 @@ def _load_corpus_into_index():
                 name = _norm_text(row.get(f_title, ''))
                 if not author or not text:
                     continue
+                text = _normalize_stanzas(text, aggressive)
                 if name:
                     index.setdefault((author, name), text)
                     if len(name) > 15:
