@@ -377,13 +377,23 @@ def enrich_data_json() -> None:
     enriched = 0
     missing = 0
     for item in data:
-        if item.get("type") != "poem":
+        # Обогащаем и обычные стихи (poem), и «библиографию» (bibliography).
+        # bibliography-записи приходят из каталога askbooka только со ссылкой,
+        # без текста; на десктопе их догружает /api/poem → _try_corpus, а на
+        # статике этот путь заглушён. Без обработки bibliography ~900 стихов
+        # классиков (Ахматова, Блок, Рыжий, Пушкин…) висели «текст недоступен».
+        if item.get("type") not in ("poem", "bibliography"):
             continue
         if item.get("text"):
             continue
         text = app._try_corpus(item)
         if text:
             item["text"] = text
+            # У каталожных записей категория техническая — «Каталог». Получив
+            # текст, стих становится полноценным; вливаем его в «Классику»,
+            # иначе в фильтрах рулетки вылезает невнятный пункт «Каталог».
+            if (item.get("category") or "").strip() in ("", "Каталог"):
+                item["category"] = "Классика"
             enriched += 1
         elif item.get("link"):
             missing += 1
