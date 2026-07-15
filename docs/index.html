@@ -358,6 +358,44 @@ img { max-width: 100%; display: block; }
 }
 .filter-drawer > summary .caret { color: var(--ink-3); transition: transform .2s; font-size: 10px; }
 .filter-drawer[open] > summary .caret { transform: rotate(180deg); }
+
+/* Чип «рулетка по автору» — встаёт на место category-drawer */
+.author-chip {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 16px;
+  border: 1px solid var(--accent);
+  background: var(--paper-2);
+  border-radius: 2px;
+  font-family: var(--font-ui);
+  font-size: 10px;
+  letter-spacing: .22em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+}
+.author-chip .name {
+  flex: 1;
+  color: var(--accent);
+  font-family: var(--font-body);
+  font-style: italic;
+  font-size: 15px;
+  letter-spacing: 0;
+  text-transform: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.author-chip .clear {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  color: var(--ink-3);
+  transition: color .15s;
+}
+.author-chip .clear:hover { color: var(--alert); }
+.author-chip .clear svg { width: 14px; height: 14px; }
 .filters {
   display: flex;
   flex-wrap: wrap;
@@ -923,6 +961,23 @@ body[data-theme='light'] .quote-card { background: #FBF6EA; }
   font-size: 11px;
   color: var(--ink-3);
 }
+.poet-head .poet-roulette {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: 14px;
+  padding: 3px 9px;
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  font-family: var(--font-ui);
+  font-size: 9px;
+  letter-spacing: .18em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  vertical-align: 3px;
+  transition: color .15s, border-color .15s;
+}
+.poet-head .poet-roulette:hover { color: var(--accent); border-color: var(--accent); }
 .poet-head .chevron { color: var(--ink-3); transition: transform .25s; }
 .poet-block.open .poet-head .chevron { transform: rotate(90deg); color: var(--accent); }
 
@@ -1657,7 +1712,14 @@ function shuffleArray(src) {
   return arr;
 }
 
-function Roulette({ data, openPoem, favs, toggleFav, onAuthorClick, lockedCategory }) {
+function declExcerpts(n) {
+  const m10 = n % 10, m100 = n % 100;
+  if (m10 === 1 && m100 !== 11) return 'отрывок';
+  if (m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14)) return 'отрывка';
+  return 'отрывков';
+}
+
+function Roulette({ data, openPoem, favs, toggleFav, onAuthorClick, lockedCategory, authorFilter, clearAuthorFilter }) {
   const { POEMS, QUOTES, CATEGORIES } = data;
   const [query, setQuery] = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
@@ -1678,6 +1740,14 @@ function Roulette({ data, openPoem, favs, toggleFav, onAuthorClick, lockedCatego
   }, [query]);
 
   const deckBase = useMemo(() => {
+    // Режим «рулетка по автору»: только его стихи с текстом + его цитаты,
+    // категории игнорируются (drawer в этом режиме скрыт).
+    if (authorFilter) {
+      return [
+        ...POEMS.filter(p => p.hasText && p.author === authorFilter),
+        ...QUOTES.filter(qt => qt.author === authorFilter),
+      ];
+    }
     if (category === '__quotes') return QUOTES;
     // В избранном показываем всё отмеченное, даже если текст не подгрузился.
     if (category === 'fav') return [...POEMS, ...QUOTES];
@@ -1691,7 +1761,7 @@ function Roulette({ data, openPoem, favs, toggleFav, onAuthorClick, lockedCatego
       return usablePoems.filter(p => p.category === name);
     }
     return [...usablePoems, ...QUOTES];
-  }, [category, POEMS, QUOTES]);
+  }, [category, POEMS, QUOTES, authorFilter]);
 
   const deckWithQuery = useMemo(() => {
     if (!debouncedQuery.trim()) return deckBase;
@@ -1780,18 +1850,22 @@ function Roulette({ data, openPoem, favs, toggleFav, onAuthorClick, lockedCatego
   const openFolder = () => fetch('/api/open-data-folder').then(() => toast('Папка открыта'));
 
   useEffect(() => () => { if (statusRef.current) clearInterval(statusRef.current); }, []);
-  useEffect(() => { setIdx(0); }, [category]);
+  useEffect(() => { setIdx(0); }, [category, authorFilter]);
 
   if (!shuffled.length) {
     return e(Fragment, null,
       e('div', { className:'hero' },
         e('div', { className:'kicker' }, 'Литературная рулетка'),
         e('h1', null, 'Случайный ', e('em', null, 'отрывок')),
-        e('p', { className:'lede' }, category === 'fav'
+        e('p', { className:'lede' }, authorFilter
+          ? ('У автора «' + authorFilter + '» пока нет текстов для рулетки.')
+          : category === 'fav'
           ? 'В избранном пока ничего нет — нажмите ♥ у любого отрывка.'
           : 'База пуста — нажмите «Обновить», чтобы подтянуть тексты.')),
       e('div', { className:'actions' },
-        category === 'fav'
+        authorFilter
+          ? e('button', { className:'btn', onClick: clearAuthorFilter }, '← Ко всем отрывкам')
+          : category === 'fav'
           ? e('button', { className:'btn', onClick: () => setCategory('all') }, '← Вернуться ко всем отрывкам')
           : e('button', { className:'btn', onClick: () => setCategory('all') }, 'База ещё подгружается…')));
   }
@@ -1834,16 +1908,24 @@ function Roulette({ data, openPoem, favs, toggleFav, onAuthorClick, lockedCatego
   const isFav = lockedCategory === 'fav';
   return e(Fragment, null,
     e('div', { className:'hero' },
-      e('div', { className:'kicker' }, isFav ? 'Ваша коллекция' : 'Литературная рулетка'),
-      e('h1', null, isFav ? 'Избранные ' : 'Случайный ', e('em', null, isFav ? 'строки' : 'отрывок')),
+      e('div', { className:'kicker' }, isFav ? 'Ваша коллекция' : authorFilter ? 'Рулетка по автору' : 'Литературная рулетка'),
+      authorFilter
+        ? e('h1', null, e('em', null, authorFilter))
+        : e('h1', null, isFav ? 'Избранные ' : 'Случайный ', e('em', null, isFav ? 'строки' : 'отрывок')),
       e('p', { className:'lede' }, isFav
         ? (shuffled.length + ' сохранено — стихи, цитаты, строки')
-        : ((POEMS.length + QUOTES.length).toLocaleString('ru-RU') + ' стихов, цитат, строк — ' + CARDS_PER_PAGE + ' в каждый приход.'))),
+        : authorFilter
+          ? (deckBase.length + ' ' + declExcerpts(deckBase.length) + ' — ' + Math.min(CARDS_PER_PAGE, deckBase.length) + ' в каждый приход.')
+          : ((POEMS.length + QUOTES.length).toLocaleString('ru-RU') + ' стихов, цитат, строк — ' + CARDS_PER_PAGE + ' в каждый приход.'))),
     e('div', { className:'toolbar' },
       e('div', { className:'search-box' }, e(Icon.search),
-        e('input', { placeholder: isFav ? 'Поиск среди избранного…' : 'Поиск среди отрывков…', value: query, onChange: ev => setQuery(ev.target.value) }),
+        e('input', { placeholder: isFav ? 'Поиск среди избранного…' : authorFilter ? 'Поиск среди отрывков автора…' : 'Поиск среди отрывков…', value: query, onChange: ev => setQuery(ev.target.value) }),
         e('span', { className:'shortcut' }, '⌘K')),
-      !lockedCategory && e('details', { className:'filter-drawer', ref: filterRef },
+      authorFilter && e('div', { className:'author-chip' },
+        'Автор',
+        e('span', { className:'name' }, authorFilter),
+        e('button', { className:'clear', onClick: clearAuthorFilter, title:'Сбросить фильтр — ко всем отрывкам' }, e(Icon.x))),
+      !lockedCategory && !authorFilter && e('details', { className:'filter-drawer', ref: filterRef },
         e('summary', null,
           e('span', { className:'summary-left' },
             'Категория',
@@ -1870,7 +1952,7 @@ function Roulette({ data, openPoem, favs, toggleFav, onAuthorClick, lockedCatego
 const POEMS_PER_BLOCK = 20;
 const POETS_INITIAL_PAGE = 40;
 
-function Library({ data, openPoem, favs, toggleFav, prefillAuthor, clearPrefill }) {
+function Library({ data, openPoem, favs, toggleFav, prefillAuthor, clearPrefill, onAuthorRoulette }) {
   const { POETS } = data;
   const [openPoet, setOpenPoet] = useState(prefillAuthor || null);
   const [query, setQuery] = useState('');
@@ -1973,7 +2055,11 @@ function Library({ data, openPoem, favs, toggleFav, prefillAuthor, clearPrefill 
           e('div', { className:'poet-head', onClick: () => !q && setOpenPoet(isOpen ? null : poet.name) },
               e('div', null,
               e('span', { className:'poet-name' }, poet.name),
-              poet.years ? e('span', { className:'poet-meta', style:{marginLeft:12} }, poet.years) : null),
+              poet.years ? e('span', { className:'poet-meta', style:{marginLeft:12} }, poet.years) : null,
+              poet.poems.some(pp => pp.hasText) ? e('button', {
+                className:'poet-roulette', title:'Крутить рулетку только по этому автору',
+                onClick: ev => { ev.stopPropagation(); onAuthorRoulette(poet.name); } },
+                '✦ рулетка') : null),
             e('span', { className:'count' }, hitCount !== null
               ? (hitCount + ' из ' + poet.count)
               : (poet.count + ' стихов')),
@@ -2371,10 +2457,12 @@ function App() {
   const [openedPoem, setOpenedPoem] = useState(null);
   const [data, setData] = useState(null);
   const [prefillAuthor, setPrefillAuthor] = useState(null);
+  // Фильтр «рулетка по одному автору» — включается кнопкой ✦ в библиотеке.
+  const [rouletteAuthor, setRouletteAuthor] = useState(null);
 
   const [backStack, setBackStack] = useState([]);
-  const currentRef = useRef({ section, litSub, cineSub });
-  useEffect(() => { currentRef.current = { section, litSub, cineSub }; }, [section, litSub, cineSub]);
+  const currentRef = useRef({ section, litSub, cineSub, rouletteAuthor });
+  useEffect(() => { currentRef.current = { section, litSub, cineSub, rouletteAuthor }; }, [section, litSub, cineSub, rouletteAuthor]);
 
   // Пушим в стек не только навигационный state, но и текущую позицию скролла —
   // при «Назад» восстанавливаем её, чтобы возврат в галерею не прыгал в начало.
@@ -2389,9 +2477,15 @@ function App() {
     setSection(v);
   };
   const navLitSub = (v) => {
-    if (v === litSub) return;
+    if (v === litSub) {
+      // Повторный клик по «Рулетке» в режиме автора — сброс на общую рулетку.
+      if (v === 'roulette' && rouletteAuthor) { pushBack(); setRouletteAuthor(null); }
+      return;
+    }
     pushBack();
     setLitSub(v);
+    // Клик по подтабу «Рулетка» всегда открывает общую рулетку без фильтра.
+    if (v === 'roulette') setRouletteAuthor(null);
   };
   const navCineSub = (v) => {
     if (v === cineSub) return;
@@ -2407,6 +2501,7 @@ function App() {
     setSection(last.section);
     setLitSub(last.litSub);
     setCineSub(last.cineSub);
+    setRouletteAuthor(last.rouletteAuthor || null);
     // Восстанавливаем прежнюю позицию скролла после того как React отрисует
     // новую секцию. 40 мс хватает для перемонтажа Cinema/Library.
     if (typeof last.scrollY === 'number') {
@@ -2481,6 +2576,14 @@ function App() {
     setPrefillAuthor(author);
   };
 
+  // Из библиотеки — в рулетку только по одному автору (кнопка ✦ у поэта).
+  const goToRouletteByAuthor = (author) => {
+    pushBack();
+    setSection('lit');
+    setLitSub('roulette');
+    setRouletteAuthor(author);
+  };
+
   if (!data) {
     return e('div', { className:'shell' },
       e(Masthead, { theme, setTheme }),
@@ -2492,11 +2595,14 @@ function App() {
 
   const litBody = litSub === 'library'
     ? e(Library, { data, openPoem: setOpenedPoem, favs, toggleFav,
-        prefillAuthor, clearPrefill: () => setPrefillAuthor(null) })
+        prefillAuthor, clearPrefill: () => setPrefillAuthor(null),
+        onAuthorRoulette: goToRouletteByAuthor })
     : litSub === 'favorites'
       ? e(Roulette, { data, openPoem: setOpenedPoem, favs, toggleFav,
           onAuthorClick: goToAuthor, lockedCategory: 'fav' })
-      : e(Roulette, { data, openPoem: setOpenedPoem, favs, toggleFav, onAuthorClick: goToAuthor });
+      : e(Roulette, { data, openPoem: setOpenedPoem, favs, toggleFav, onAuthorClick: goToAuthor,
+          authorFilter: rouletteAuthor,
+          clearAuthorFilter: () => { pushBack(); setRouletteAuthor(null); } });
 
   const showBack = backStack.length > 0 || !!openedPoem;
 
