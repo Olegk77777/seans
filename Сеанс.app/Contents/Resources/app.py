@@ -55,10 +55,17 @@ CORPUS_SOURCES = [
         "url": "https://huggingface.co/datasets/vicemik/brodsky-poetry/resolve/main/brod_poems_with_titles.csv",
         "filename": "corpus_brodsky.csv",
         "fields": {"author": "author", "title": "title", "text": "text"},
-        # У Бродского в этом датасете author = просто "Бродский"; нормализуем
+        # default_author подставляется, только если колонка author пустая.
+        # В этом датасете там «Бродский» — полное имя ставит AUTHOR_ALIASES.
         "default_author": "Иосиф Бродский",
     },
 ]
+# Одно и то же имя в разных источниках записано по-разному. Без склейки
+# библиотека и рулетка показывают двух разных поэтов, а одноимённые стихи
+# не распознаются как дубли (дедупликация идёт по паре автор + название).
+AUTHOR_ALIASES = {
+    "Бродский": "Иосиф Бродский",
+}
 # Старая константа — для обратной совместимости. Старое имя файла.
 CORPUS_FILE = DATA_DIR / "corpus.csv"
 CORPUS_URL = CORPUS_SOURCES[0]["url"]
@@ -797,6 +804,7 @@ def _parse_corpus_items():
                 reader = _csv.DictReader(f)
                 for row in reader:
                     a = (row.get(f_author) or default_author or '').strip()
+                    a = AUTHOR_ALIASES.get(a, a)
                     t = (row.get(f_title) or '').strip()
                     text = (row.get(f_text) or '').strip()
                     if not a or not t or not text:
