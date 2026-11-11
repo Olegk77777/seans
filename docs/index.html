@@ -359,43 +359,109 @@ img { max-width: 100%; display: block; }
 .filter-drawer > summary .caret { color: var(--ink-3); transition: transform .2s; font-size: 10px; }
 .filter-drawer[open] > summary .caret { transform: rotate(180deg); }
 
-/* Чип «рулетка по автору» — встаёт на место category-drawer */
-.author-chip {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  padding: 10px 16px;
-  border: 1px solid var(--accent);
-  background: var(--paper-2);
-  border-radius: 2px;
-  font-family: var(--font-ui);
-  font-size: 10px;
-  letter-spacing: .22em;
-  text-transform: uppercase;
-  color: var(--ink-2);
+/* Ряд фильтров рулетки: «Категория» + «Поэт» рядом.
+   Когда выбран поэт, категория скрыта и «Поэт» занимает всю ширину. */
+.filter-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  align-items: start;
 }
-.author-chip .name {
-  flex: 1;
-  color: var(--accent);
-  font-family: var(--font-body);
-  font-style: italic;
-  font-size: 15px;
-  letter-spacing: 0;
-  text-transform: none;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.author-chip .clear {
+.filter-row.single { grid-template-columns: 1fr; }
+@media (max-width: 640px) { .filter-row { grid-template-columns: 1fr; } }
+
+/* Выбор поэта — рулетка только по его стихам и цитатам */
+.poet-drawer.active { border-color: var(--accent); }
+.poet-drawer > summary .summary-right { display: flex; align-items: center; gap: 10px; }
+.poet-drawer > summary .clear {
   display: grid;
   place-items: center;
   width: 22px;
   height: 22px;
+  margin: -4px 0;
   color: var(--ink-3);
   transition: color .15s;
 }
-.author-chip .clear:hover { color: var(--alert); }
-.author-chip .clear svg { width: 14px; height: 14px; }
+.poet-drawer > summary .clear:hover { color: var(--alert); }
+.poet-drawer > summary .clear svg { width: 14px; height: 14px; }
+.poet-picker {
+  border-top: 1px solid var(--line-2);
+  padding: 12px 14px 14px;
+}
+.poet-picker-head {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 10px;
+}
+.poet-picker-head input {
+  flex: 1;
+  min-width: 0;
+  padding: 7px 12px;
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  background: var(--paper);
+  font-family: var(--font-body);
+  font-size: 16px;
+  color: var(--ink);
+  outline: 0;
+  transition: border-color .15s;
+}
+.poet-picker-head input:focus { border-color: var(--accent); }
+.poet-picker-head input::placeholder { color: var(--ink-3); font-style: italic; }
+.poet-picker-head .random {
+  flex: 0 0 auto;
+  padding: 7px 12px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  font-family: var(--font-ui);
+  font-size: 11px;
+  letter-spacing: .04em;
+  color: var(--ink-2);
+  white-space: nowrap;
+  transition: color .15s, border-color .15s;
+}
+.poet-picker-head .random:hover { color: var(--accent); border-color: var(--accent); }
+.poet-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 0 14px;
+  max-height: 280px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line) transparent;
+}
+.poet-list::-webkit-scrollbar { width: 8px; }
+.poet-list::-webkit-scrollbar-thumb { background: var(--line); border-radius: 4px; }
+.poet-opt {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 5px 8px;
+  border-radius: 2px;
+  text-align: left;
+  font-family: var(--font-body);
+  font-size: 16px;
+  color: var(--ink-2);
+  transition: color .12s, background .12s;
+}
+.poet-opt .n { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.poet-opt .c {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+}
+.poet-opt:hover { color: var(--ink); background: var(--paper-3); }
+.poet-opt.active { color: var(--accent); font-style: italic; }
+.poet-opt.all { font-family: var(--font-ui); font-size: 11px; letter-spacing: .18em; text-transform: uppercase; }
+.poet-empty {
+  grid-column: 1 / -1;
+  padding: 10px 8px;
+  font-family: var(--font-body);
+  font-style: italic;
+  color: var(--ink-3);
+}
 .filters {
   display: flex;
   flex-wrap: wrap;
@@ -1719,10 +1785,14 @@ function declExcerpts(n) {
   return 'отрывков';
 }
 
-function Roulette({ data, openPoem, favs, toggleFav, onAuthorClick, lockedCategory, authorFilter, clearAuthorFilter }) {
-  const { POEMS, QUOTES, CATEGORIES } = data;
+function Roulette({ data, openPoem, favs, toggleFav, onAuthorClick, lockedCategory, authorFilter, clearAuthorFilter, setAuthorFilter }) {
+  const { POEMS, QUOTES, POETS, CATEGORIES } = data;
   const [query, setQuery] = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
+  // Выбор поэта прямо в рулетке: поиск по имени внутри выпадашки «Поэт».
+  const [poetQuery, setPoetQuery] = useState('');
+  const poetRef = useRef(null);
+  const poetInputRef = useRef(null);
   const [categoryState, setCategoryState] = useState(lockedCategory || 'all');
   const category = lockedCategory || categoryState;
   const setCategory = (v) => { if (!lockedCategory) setCategoryState(v); };
@@ -1762,6 +1832,26 @@ function Roulette({ data, openPoem, favs, toggleFav, onAuthorClick, lockedCatego
     }
     return [...usablePoems, ...QUOTES];
   }, [category, POEMS, QUOTES, authorFilter]);
+
+  // Поэты для выпадашки: только те, у кого есть стихи с текстом.
+  // Счётчик = стихи с текстом + цитаты автора — ровно столько карточек
+  // будет в его рулетке.
+  const poetOptions = useMemo(() => {
+    const quoteCount = new Map();
+    for (const qt of QUOTES) quoteCount.set(qt.author, (quoteCount.get(qt.author) || 0) + 1);
+    const out = [];
+    for (const p of (POETS || [])) {
+      const withText = p.poems.filter(x => x.hasText).length;
+      if (!withText) continue;
+      out.push({ name: p.name, nameHay: p.nameHay, count: withText + (quoteCount.get(p.name) || 0) });
+    }
+    return out;
+  }, [POETS, QUOTES]);
+
+  const poetMatches = useMemo(() => {
+    const q = normalize(poetQuery);
+    return q ? poetOptions.filter(p => p.nameHay.includes(q)) : poetOptions;
+  }, [poetOptions, poetQuery]);
 
   const deckWithQuery = useMemo(() => {
     if (!debouncedQuery.trim()) return deckBase;
@@ -1852,7 +1942,11 @@ function Roulette({ data, openPoem, favs, toggleFav, onAuthorClick, lockedCatego
   useEffect(() => () => { if (statusRef.current) clearInterval(statusRef.current); }, []);
   useEffect(() => { setIdx(0); }, [category, authorFilter]);
 
-  if (!shuffled.length) {
+  // Поиск ничего не нашёл — это не «пустая база»: оставляем панель
+  // с поиском на месте, иначе запрос нечем стереть.
+  const noMatches = !shuffled.length && !!debouncedQuery.trim();
+
+  if (!shuffled.length && !noMatches) {
     return e(Fragment, null,
       e('div', { className:'hero' },
         e('div', { className:'kicker' }, 'Литературная рулетка'),
@@ -1878,6 +1972,60 @@ function Roulette({ data, openPoem, favs, toggleFav, onAuthorClick, lockedCatego
     setIdx(0);
     if (filterRef.current) filterRef.current.open = false;
   };
+
+  const selectPoet = (name) => {
+    if (poetRef.current) poetRef.current.open = false;
+    setPoetQuery('');
+    if ((name || null) === (authorFilter || null)) return;
+    if (name) setAuthorFilter(name); else clearAuthorFilter();
+  };
+
+  // «✦ Случайный» — рулетка выбирает самого поэта (среди найденных, если
+  // в поле что-то набрано), но не того же, что уже выбран.
+  const randomPoet = () => {
+    const pool = poetMatches.filter(p => p.name !== authorFilter);
+    if (pool.length) selectPoet(pool[Math.floor(Math.random() * pool.length)].name);
+  };
+
+  const categoryDrawer = e('details', { className:'filter-drawer', ref: filterRef },
+    e('summary', null,
+      e('span', { className:'summary-left' },
+        'Категория',
+        e('span', { className:'active-chip' }, activeCatLabel, category === 'fav' ? (' · ' + favs.size) : '')),
+      e('span', { className:'caret' }, '▾')),
+    e('div', { className:'filters' }, categoriesWithFav.map(c =>
+      e('button', { key: c.id, className: 'chip '+(category===c.id?'active':''), onClick: () => selectCategory(c.id) },
+        c.label, e('span', { className:'c' }, c.count)))));
+
+  const poetDrawer = setAuthorFilter && e('details', {
+      className: 'filter-drawer poet-drawer' + (authorFilter ? ' active' : ''),
+      ref: poetRef,
+      onToggle: ev => { if (ev.currentTarget.open && poetInputRef.current) poetInputRef.current.focus(); } },
+    e('summary', null,
+      e('span', { className:'summary-left' },
+        'Поэт',
+        e('span', { className:'active-chip' }, authorFilter || 'Все')),
+      e('span', { className:'summary-right' },
+        authorFilter && e('button', {
+          className:'clear', title:'Сбросить — ко всем отрывкам',
+          onClick: ev => { ev.preventDefault(); ev.stopPropagation(); selectPoet(null); } }, e(Icon.x)),
+        e('span', { className:'caret' }, '▾'))),
+    e('div', { className:'poet-picker' },
+      e('div', { className:'poet-picker-head' },
+        e('input', {
+          ref: poetInputRef, placeholder:'Найти поэта…', value: poetQuery,
+          onChange: ev => setPoetQuery(ev.target.value),
+          onKeyDown: ev => { if (ev.key === 'Enter' && poetMatches.length) selectPoet(poetMatches[0].name); } }),
+        e('button', { className:'random', onClick: randomPoet, title:'Пусть рулетка выберет поэта' }, '✦ Случайный')),
+      e('div', { className:'poet-list' },
+        !poetQuery && e('button', { className:'poet-opt all' + (!authorFilter ? ' active' : ''), onClick: () => selectPoet(null) },
+          e('span', { className:'n' }, 'Все поэты')),
+        poetMatches.map(p => e('button', {
+            key: p.name, className:'poet-opt' + (p.name === authorFilter ? ' active' : ''),
+            onClick: () => selectPoet(p.name) },
+          e('span', { className:'n' }, p.name),
+          e('span', { className:'c' }, p.count))),
+        !poetMatches.length && e('div', { className:'poet-empty' }, 'Такого поэта в базе нет'))));
 
   const renderCard = (item, i) => {
     const folio = String(((safeIdx + i) % Math.max(shuffled.length, 1)) + 1).padStart(3, '0');
@@ -1921,27 +2069,23 @@ function Roulette({ data, openPoem, favs, toggleFav, onAuthorClick, lockedCatego
       e('div', { className:'search-box' }, e(Icon.search),
         e('input', { placeholder: isFav ? 'Поиск среди избранного…' : authorFilter ? 'Поиск среди отрывков автора…' : 'Поиск среди отрывков…', value: query, onChange: ev => setQuery(ev.target.value) }),
         e('span', { className:'shortcut' }, '⌘K')),
-      authorFilter && e('div', { className:'author-chip' },
-        'Автор',
-        e('span', { className:'name' }, authorFilter),
-        e('button', { className:'clear', onClick: clearAuthorFilter, title:'Сбросить фильтр — ко всем отрывкам' }, e(Icon.x))),
-      !lockedCategory && !authorFilter && e('details', { className:'filter-drawer', ref: filterRef },
-        e('summary', null,
-          e('span', { className:'summary-left' },
-            'Категория',
-            e('span', { className:'active-chip' }, activeCatLabel, category === 'fav' ? (' · ' + favs.size) : '')),
-          e('span', { className:'caret' }, '▾')),
-        e('div', { className:'filters' }, categoriesWithFav.map(c =>
-          e('button', { key: c.id, className: 'chip '+(category===c.id?'active':''), onClick: () => selectCategory(c.id) },
-            c.label, e('span', { className:'c' }, c.count)))))),
+      // По поэту рулетка берёт все его стихи и цитаты, категория не нужна —
+      // поэтому при выбранном поэте прячем «Категорию».
+      !lockedCategory && e('div', { className: 'filter-row' + ((authorFilter || !poetDrawer) ? ' single' : '') },
+        !authorFilter && categoryDrawer,
+        poetDrawer)),
     e('div', { className:'actions' },
       e('button', { className:'btn primary', onClick: shuffle }, e('span', { className:'glyph' }, '✦'), 'Перемешать'),
       null),
-    e('div', { className:'status-bar' },
-      'Показано ', e('span', null, pageFrom + '–' + pageTo), ' из ', e('span', null, shuffled.length),
-      updating ? (' · ' + updateStage) : ''),
-    e('div', { className:'card-stack' }, visible.map(renderCard)),
-    e('div', { className:'nav-buttons' },
+    noMatches
+      ? e('div', { className:'status-bar' },
+          'По запросу «', e('span', null, debouncedQuery.trim()), '» ничего не нашлось',
+          authorFilter ? (' у автора ' + authorFilter) : '', ' — попробуйте другое слово')
+      : e('div', { className:'status-bar' },
+          'Показано ', e('span', null, pageFrom + '–' + pageTo), ' из ', e('span', null, shuffled.length),
+          updating ? (' · ' + updateStage) : ''),
+    !noMatches && e('div', { className:'card-stack' }, visible.map(renderCard)),
+    !noMatches && e('div', { className:'nav-buttons' },
       e('button', { className:'btn-nav', onClick: () => step(-1) }, '← Предыдущие'),
       e('span', { className:'page-ind' },
         String(pageFrom).padStart(3, '0'), '–', String(pageTo).padStart(3, '0'), ' / ', String(shuffled.length).padStart(3, '0')),
@@ -2602,6 +2746,7 @@ function App() {
           onAuthorClick: goToAuthor, lockedCategory: 'fav' })
       : e(Roulette, { data, openPoem: setOpenedPoem, favs, toggleFav, onAuthorClick: goToAuthor,
           authorFilter: rouletteAuthor,
+          setAuthorFilter: (a) => { pushBack(); setRouletteAuthor(a); },
           clearAuthorFilter: () => { pushBack(); setRouletteAuthor(null); } });
 
   const showBack = backStack.length > 0 || !!openedPoem;
